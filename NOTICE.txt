@@ -1,5 +1,5 @@
 easiBeacon Basic iBeacon Android Library
-Copyright 2014 easiBeacon
+Copyright 2014 Easi Technologies and Consulting Services, S.L.
 
 This library includes software developed at
-easiBeacon http://easibeacon.com
+Easi Technologies and Consulting Services, S.L. (http://easibeacon.com)
