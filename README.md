@@ -1,5 +1,5 @@
-ibeacon-android-library
-=======================
+easiBeacon Basic iBeacon Android Library
+========================================
 
 This is easiBeacon basic implementation of an iBeacon Android library
 
