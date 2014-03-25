@@ -211,9 +211,9 @@ public class IBeaconProtocol {
 	    		newBeacon.setEasiBeacon(false);
 	    	
 	    	// Review this
-	    	Log.i(Utils.LOG_TAG,device.getName() + " " + device.getAddress() + " " + newBeacon.getTxPower() + " " + rssi);
+	    	Log.i(Utils.LOG_TAG,device.getName() + " " + device.getAddress() + " " + newBeacon.getPowerValue() + " " + rssi);
 	    	if(newBeacon.isEasiBeacon())
-	    		newBeacon.setProximity((int)calculateDistance(IBeacon.EASIBEACON_POWER_VALUE, rssi));
+	    		newBeacon.setProximity((int)calculateDistance(newBeacon.getPowerValue(), rssi));
 	    	
 	    	// Add to array if not there
 	    	if(!_arrOrderedIBeacons.contains(newBeacon)){
@@ -319,7 +319,7 @@ public class IBeaconProtocol {
 				ibeacon.setMajor(major);
 				int minor = ((data[offset+2] << 8) & 0x0000ff00) | (data[offset+3] & 0x000000ff);
 				ibeacon.setMinor(minor);
-				ibeacon.setTxPower(data[offset+4]);
+				ibeacon.setPowerValue(data[offset+4]);
 				return ibeacon;
 				}
 			}

@@ -58,7 +58,7 @@ public class IBeacon implements Serializable{
 	/**
 	 * RSSI at 1 meter reported by the iBeacon
 	 */
-	private int _txPower;
+	private int _powerValue;
 	
 	/**
 	 * A calculated proximity of the iBeacon based on <code>_powerValue</code>
@@ -73,7 +73,7 @@ public class IBeacon implements Serializable{
 	/**
 	 * RSSI at 1 meter in straight line for easiBeacons
 	 */	
-	public static final int EASIBEACON_POWER_VALUE = -64;
+	public static final int EASIBEACON_POWER_VALUE = -75;
 	
 	/**
 	 * Constructor
@@ -166,12 +166,12 @@ public class IBeacon implements Serializable{
 		this._easiBeacon = _easiBeacon;
 	}
 
-	public int getTxPower() {
-		return _txPower;
+	public int getPowerValue() {
+		return _powerValue;
 	}
 
-	public void setTxPower(int _txPower) {
-		this._txPower = _txPower;
+	public void setPowerValue(int _pv) {
+		this._powerValue = _pv;
 	}
 
 	public int getProximity() {
