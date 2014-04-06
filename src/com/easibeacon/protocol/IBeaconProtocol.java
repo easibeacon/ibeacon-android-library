@@ -216,7 +216,7 @@ public class IBeaconProtocol {
 	    	// Review this
 	    	Log.i(Utils.LOG_TAG,device.getName() + " " + device.getAddress() + " " + newBeacon.getPowerValue() + " " + rssi);
 	    	//if(newBeacon.isEasiBeacon())
-	    	newBeacon.setProximity((int)calculateDistance(newBeacon.getPowerValue(), rssi));
+	    	newBeacon.setProximity((double)calculateDistance(newBeacon.getPowerValue(), rssi));
 	    	
 	    	// Add to array if not there
 	    	if(!_arrOrderedIBeacons.contains(newBeacon)){
