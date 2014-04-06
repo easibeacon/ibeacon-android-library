@@ -359,7 +359,7 @@ public class IBeaconProtocol {
 	private class IBeaconProximityComparator implements Comparator<IBeacon> {
 	    @Override
 	    public int compare(IBeacon b1, IBeacon b2) {
-	        return b1.getProximity()-b2.getProximity();
+	        return (int)(b1.getProximity()-b2.getProximity());
 	    }
 	}
 	

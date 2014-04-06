@@ -63,7 +63,7 @@ public class IBeacon implements Serializable{
 	/**
 	 * A calculated proximity of the iBeacon based on <code>_powerValue</code>
 	 */	
-	private int _proximity;
+	private double _proximity;
 	
 	/***
 	  * RSSI value
@@ -88,7 +88,7 @@ public class IBeacon implements Serializable{
 	 * @param minor The Minor number (1-65535)
 	 * @param proximity Proximity in meters
 	 */
-	public IBeacon(byte[] uuid, int major, int minor, int proximity){
+	public IBeacon(byte[] uuid, int major, int minor, double proximity){
 		_uuid = uuid;
 		_major = major;
 		_minor = minor;
@@ -179,11 +179,11 @@ public class IBeacon implements Serializable{
 		this._powerValue = _pv;
 	}
 
-	public int getProximity() {
+	public double getProximity() {
 		return _proximity;
 	}
 	
-	public void setProximity(int _proximity) {
+	public void setProximity(double _proximity) {
 		this._proximity = _proximity;
 	}
 	
