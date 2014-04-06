@@ -43,7 +43,7 @@ public class IBeaconProtocol {
 	/**
 	 * The BLE advertisement prefix for identifying iBeacons
 	 */
-	public static final byte[] ADV_PREFIX = {0x02, 0x01, 0x06, 0x1A, (byte) 0xFF, 0x4C, 0x00, 0x02, 0x15};
+	//public static final byte[] ADV_PREFIX = {0x02, 0x01, 0x06, 0x1A, (byte) 0xFF, 0x4C, 0x00, 0x02, 0x15};
 
 	/**
 	 * Scanning period for iBeacon discovery in miliseconds
@@ -198,22 +198,25 @@ public class IBeaconProtocol {
 	    public void onLeScan(final BluetoothDevice device, int rssi,
 	            byte[] scanRecord) {
 	    	
-	    	IBeacon newBeacon = parseAdvertisementData(scanRecord);
 	    	
+	    	
+	    	IBeacon newBeacon = parseAdvertisementData(scanRecord);
 	    	// If it is not a iBeacon, return
 	    	if(newBeacon == null)
 	    		return;
 	    	
 	    	newBeacon.setMacAddress(device.getAddress());
-	    	if(device.getName().startsWith(EASIBEACON_IDPREFIX))
+	    	newBeacon.setRssiValue(rssi);
+	    	
+	    	if(device.getName()!=null && device.getName().startsWith(EASIBEACON_IDPREFIX))
 	    		newBeacon.setEasiBeacon(true);
 	    	else
 	    		newBeacon.setEasiBeacon(false);
 	    	
 	    	// Review this
 	    	Log.i(Utils.LOG_TAG,device.getName() + " " + device.getAddress() + " " + newBeacon.getPowerValue() + " " + rssi);
-	    	if(newBeacon.isEasiBeacon())
-	    		newBeacon.setProximity((int)calculateDistance(newBeacon.getPowerValue(), rssi));
+	    	//if(newBeacon.isEasiBeacon())
+	    	newBeacon.setProximity((double)calculateDistance(newBeacon.getPowerValue(), rssi));
 	    	
 	    	// Add to array if not there
 	    	if(!_arrOrderedIBeacons.contains(newBeacon)){
@@ -308,21 +311,27 @@ public class IBeaconProtocol {
 	 */
 	private IBeacon parseAdvertisementData(byte[] data){
 		// First, check the prefix for easiBeacons
-		if(Arrays.equals(ADV_PREFIX, Arrays.copyOfRange(data, 0, ADV_PREFIX.length))){
-			byte[] uuid = Arrays.copyOfRange(data, ADV_PREFIX.length, ADV_PREFIX.length+UUID_LEN);
-			// Now filter our beacons UUID if any
-			if(_uuid == null || Arrays.equals(_uuid, uuid)){
-				int offset = ADV_PREFIX.length + UUID_LEN;
-				IBeacon ibeacon = new IBeacon();
-				ibeacon.setUuid(uuid);
-				int major = ((data[offset] << 8) & 0x0000ff00) | (data[offset+1] & 0x000000ff);
-				ibeacon.setMajor(major);
-				int minor = ((data[offset+2] << 8) & 0x0000ff00) | (data[offset+3] & 0x000000ff);
-				ibeacon.setMinor(minor);
-				ibeacon.setPowerValue(data[offset+4]);
-				return ibeacon;
-				}
-			}
+		int startByte = 2;
+		
+		
+		while (startByte <= 5) {		  
+		  if (((int)data[startByte+2] & 0xff) == 0x02 && ((int)data[startByte+3] & 0xff) == 0x15) {
+			  byte[] uuid = new byte[16];
+			  System.arraycopy(data, startByte+4, uuid, 0, 16);
+			  
+			  // Now filter our beacons UUID if any
+			  if(_uuid == null || Arrays.equals(_uuid, uuid)){
+				  IBeacon ibeacon = new IBeacon();
+				  ibeacon.setUuid(uuid);
+				  ibeacon.setMajor((data[startByte+20] & 0xff) * 0x100 + (data[startByte+21] & 0xff));
+				  ibeacon.setMinor((data[startByte+22] & 0xff) * 0x100 + (data[startByte+23] & 0xff));
+				  ibeacon.setPowerValue((int)data[startByte+24]);
+				  return ibeacon;
+			  }
+			  break;
+		  }
+		  startByte++;
+		}
 		return null;
 	}
 	
@@ -350,6 +359,8 @@ public class IBeaconProtocol {
 		}
 	} 
 	
+	
+	
 	/**
 	 * Implements a proximity comparator of distance for iBeacons
 	 * @author inakivazquez
@@ -358,7 +369,7 @@ public class IBeaconProtocol {
 	private class IBeaconProximityComparator implements Comparator<IBeacon> {
 	    @Override
 	    public int compare(IBeacon b1, IBeacon b2) {
-	        return b1.getProximity()-b2.getProximity();
+	        return (int)(b1.getProximity()-b2.getProximity());
 	    }
 	}
 	
