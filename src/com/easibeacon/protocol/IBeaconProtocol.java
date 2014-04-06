@@ -205,6 +205,7 @@ public class IBeaconProtocol {
 	    		return;
 	    	
 	    	newBeacon.setMacAddress(device.getAddress());
+	    	newBeacon.setRssiValue(rssi);
 	    	if(device.getName().startsWith(EASIBEACON_IDPREFIX))
 	    		newBeacon.setEasiBeacon(true);
 	    	else

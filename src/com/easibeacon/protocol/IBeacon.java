@@ -64,6 +64,11 @@ public class IBeacon implements Serializable{
 	 * A calculated proximity of the iBeacon based on <code>_powerValue</code>
 	 */	
 	private int _proximity;
+	
+	/***
+	  * RSSI value
+	  */
+	private int _rssi;
 
 	/**
 	 * The MAC address reported by the iBeacon
@@ -181,6 +186,16 @@ public class IBeacon implements Serializable{
 	public void setProximity(int _proximity) {
 		this._proximity = _proximity;
 	}
+	
+	
+	public int getRssiValue() {
+		return _rssi;
+	}
+
+	public void setRssiValue(int _pv) {
+		this._rssi = _pv;
+	}
+	
 	
 
 	/**
