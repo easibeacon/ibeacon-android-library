@@ -25,5 +25,6 @@ public class Utils {
 	/**
 	 * The Log tag for debugging messages
 	 */
-	public final static String LOG_TAG = "easiBeacon";
+	public final static String LOG_TAG = "easiBeacon";	
+	
 }

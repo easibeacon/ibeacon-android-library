@@ -25,10 +25,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
-
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothManager;
+import android.bluetooth.BluetoothProfile;
 import android.content.Context;
 import android.os.Handler;
 import android.util.Log;
@@ -41,10 +41,15 @@ import android.util.Log;
  */
 public class IBeaconProtocol {
 	/**
-	 * The BLE advertisement prefix for identifying iBeacons
+	 * The BLE advertisement prefix length
 	 */
-	public static final byte[] ADV_PREFIX = {0x02, 0x01, 0x06, 0x1A, (byte) 0xFF, 0x4C, 0x00, 0x02, 0x15};
-
+	public static final int ADV_PREFIX_LENGTH = 9;
+	
+	/**
+	 * UUID length
+	 */	
+	public static final int ADV_UUID_LENGTH = 16;
+	
 	/**
 	 * Scanning period for iBeacon discovery in miliseconds
 	 */		
@@ -54,11 +59,6 @@ public class IBeaconProtocol {
 	 * The prefix for identifying easiBeacons
 	 */	
 	public static final String EASIBEACON_IDPREFIX = "easiBeacon_";
-	
-	/**
-	 * Length in bytes of iBeacon UUID
-	 */	
-	public static final int UUID_LEN = 16;
 	
 	/**
 	 * State of the search process to notify the listener: started
@@ -110,6 +110,9 @@ public class IBeaconProtocol {
 	 */	
 	private ArrayList<IBeacon> _arrOrderedIBeacons = new ArrayList<IBeacon>();
 	
+	// For controlling and resetting the timeout
+	private Handler _timeoutHandler;
+	
 	/**
 	 * Private empty constructor
 	 */
@@ -124,8 +127,6 @@ public class IBeaconProtocol {
 	public static IBeaconProtocol getInstance(Context c){
 		if(_ibp == null){
 			_ibp = new IBeaconProtocol();
-			if(!initializeBluetoothAdapter(c))
-				return null;
 		}
 		return _ibp;
 	}
@@ -164,7 +165,6 @@ public class IBeaconProtocol {
 		_previousNearestIBeacon = null;
 	}
 	
-	
 	/**
 	 * Informs if the system is currently scanning for iBeacons
 	 * 
@@ -175,12 +175,13 @@ public class IBeaconProtocol {
 	}
 	
 	/**
-	 * Initializes the Bluetooth adapter and stores a reference to it
+	 * Configures the Bluetooth adapter and stores a reference to it
 	 * 
 	 * @param c the current context
 	 * @return <code>true</code> if initialization was successful. <code>false</code> otherwise.
 	 */
-	public static boolean initializeBluetoothAdapter(Context c){
+	public static boolean configureBluetoothAdapter(Context c){
+		// Initializes Bluetooth adapter.
 		final BluetoothManager bluetoothManager =
 		        (BluetoothManager) c.getSystemService(Context.BLUETOOTH_SERVICE);
 		_ibp._bluetoothAdapter = bluetoothManager.getAdapter();
@@ -198,34 +199,76 @@ public class IBeaconProtocol {
 	    public void onLeScan(final BluetoothDevice device, int rssi,
 	            byte[] scanRecord) {
 	    	
-	    	IBeacon newBeacon = parseAdvertisementData(scanRecord);
+			Log.i(Utils.LOG_TAG,"BLE packet received");
 	    	
-	    	// If it is not a iBeacon, return
+	    	IBeacon newBeacon = parseAdvertisementData(scanRecord);
 	    	if(newBeacon == null)
 	    		return;
 	    	
 	    	newBeacon.setMacAddress(device.getAddress());
-	    	if(device.getName().startsWith(EASIBEACON_IDPREFIX))
-	    		newBeacon.setEasiBeacon(true);
-	    	else
-	    		newBeacon.setEasiBeacon(false);
+
+	    	// If already discovered, then just refresh the RSSI of the existing instance and return
+	    	if(_arrOrderedIBeacons.contains(newBeacon)){
+	    		int newDistance = (int)calculateDistance(newBeacon.getPowerValue(), rssi);
+	    		IBeacon previousIBeaconInfo = findIfExists(newBeacon);
+	    		int oldDistance = previousIBeaconInfo.getProximity();
+	    		if(newDistance < oldDistance){
+	    			Log.i(Utils.LOG_TAG,"Updating distance");
+	    			previousIBeaconInfo.setProximity(newDistance);
+		    		// Sort again
+			    	Collections.sort(_arrOrderedIBeacons, new IBeaconProximityComparator());
+	    		}
+	    		return;
+	    	}
 	    	
+    		newBeacon.setEasiBeacon(false);
+	    	if(device.getName() != null){
+		    	if(device.getName().startsWith(EASIBEACON_IDPREFIX)){
+		    		newBeacon.setEasiBeacon(true);
+		    		String version = device.getName().substring(EASIBEACON_IDPREFIX.length());
+		    		newBeacon.setVersionModel(version);
+		    		if(newBeacon.getVersion() == 1){
+		    			// Version 1 is always connectable
+		    			newBeacon.setConnectable(true);
+		    		}else if(newBeacon.getVersion() == 2){
+		    			newBeacon.setConnectable(getConnectable(scanRecord));
+		    			if(!newBeacon.isConnectable())
+		    				newBeacon.setEasiBeacon(false); //If not connectable we will report it as unknown 
+		    		}		    		
+		    	}
+	    	}
 	    	// Review this
-	    	Log.i(Utils.LOG_TAG,device.getName() + " " + device.getAddress() + " " + newBeacon.getPowerValue() + " " + rssi);
-	    	if(newBeacon.isEasiBeacon())
-	    		newBeacon.setProximity((int)calculateDistance(newBeacon.getPowerValue(), rssi));
+	    	Log.i(Utils.LOG_TAG,device.getName() + " " + device.getAddress() + " " + newBeacon.getPowerValue() + " " + rssi + " Connectable: " + newBeacon.isConnectable());
+	    	newBeacon.setProximity((int)calculateDistance(newBeacon.getPowerValue(), rssi));
 	    	
-	    	// Add to array if not there
 	    	if(!_arrOrderedIBeacons.contains(newBeacon)){
 		    	_arrOrderedIBeacons.add(newBeacon);
 		    	Collections.sort(_arrOrderedIBeacons, new IBeaconProximityComparator());
-		    	
-		    	// Notify listener a new iBeacon was found
 		    	_listener.beaconFound(newBeacon);
+		    	
+		    	// Every time a new beacon is found, reset the timeout
+		    	_timeoutHandler.removeCallbacks(timeoutTask);
+				_timeoutHandler.postDelayed(timeoutTask, IBeaconProtocol.SCANNING_PERIOD);
+
 	    	} 	
-	   }       
+	   }
+	       
 	};
 	
+	/**
+	 * Finds an ibeacon in the list of previously discovered ibeacons
+	 * 
+	 * @param b ibeacon to find
+	 * @return <code>null</code> if the ibeacon is not found, the existing copy of the ibeacon otherwise.
+	 */
+	private IBeacon findIfExists(IBeacon b){
+		for(int i=0;i<_arrOrderedIBeacons.size();i++){
+			IBeacon existing = (IBeacon)_arrOrderedIBeacons.get(i);
+			if(existing.equals(b))
+				return existing;
+		}
+		return null;
+	}
 	
 	/**
 	 * Notifies the listener about possible region-based events
@@ -266,9 +309,26 @@ public class IBeaconProtocol {
 		return _bluetoothAdapter.getRemoteDevice(mac);
 	}
 	
+	/**
+	 * Sets a UUID to filter ibeacons based on that UUID
+	 * @param uuid the UUID to filter ibeacon advertisements
+	 */
 	public void setScanUUID(byte[] uuid){
 		_uuid = uuid;
 	}
+	
+	private Runnable timeoutTask = new Runnable() {
+		@Override
+		public void run() {
+			_scanning = false;
+			_bluetoothAdapter.stopLeScan(mLeScanCallback);
+			if(_arrOrderedIBeacons.size() == 0)
+				_listener.searchState(SEARCH_END_EMPTY);
+			else
+				_listener.searchState(SEARCH_END_SUCCESS);
+			notifyListener();
+		}
+	};
 	
 	/**
 	 * Starts or stops the scanning process looking for iBeacons
@@ -276,19 +336,9 @@ public class IBeaconProtocol {
 	 */
 	public void scanIBeacons(final boolean enable) {
 		if (enable) {
-			// Stops scanning after a pre-defined  period
-			new Handler().postDelayed(new Runnable() {
-				@Override
-				public void run() {
-					_scanning = false;
-					_bluetoothAdapter.stopLeScan(mLeScanCallback);
-					if(_arrOrderedIBeacons.size() == 0)
-						_listener.searchState(SEARCH_END_EMPTY);
-					else
-						_listener.searchState(SEARCH_END_SUCCESS);
-					notifyListener();
-				}
-			}, IBeaconProtocol.SCANNING_PERIOD);
+			// Stops scanning after a pre-defined scan period.
+			_timeoutHandler = new Handler();
+			_timeoutHandler.postDelayed(timeoutTask, IBeaconProtocol.SCANNING_PERIOD);
 
 			_scanning = true;
 			_arrOrderedIBeacons.clear();
@@ -299,6 +349,24 @@ public class IBeaconProtocol {
 			_bluetoothAdapter.stopLeScan(mLeScanCallback);
 			_listener.searchState(SEARCH_END_SUCCESS);
 		}
+		// Cannot obtain error status=133 this way
+		Log.i(Utils.LOG_TAG,"The status:" + _bluetoothAdapter.getProfileConnectionState(BluetoothProfile.GATT));
+	}
+	
+	/**
+	 * Direct call to start scanning for iBeacons
+	 */
+	public void startScan(){
+		if(_bluetoothAdapter != null)
+			scanIBeacons(true);
+	}
+	
+	/**
+	 * Direct call to stop scanning for iBeacons
+	 */
+	public void stopScan(){
+		if(_bluetoothAdapter != null)
+			scanIBeacons(false);
 	}
 
 	/**
@@ -307,12 +375,13 @@ public class IBeaconProtocol {
 	 * @return the IBeacon found or null if not an iBeacon
 	 */
 	private IBeacon parseAdvertisementData(byte[] data){
-		// First, check the prefix for easiBeacons
-		if(Arrays.equals(ADV_PREFIX, Arrays.copyOfRange(data, 0, ADV_PREFIX.length))){
-			byte[] uuid = Arrays.copyOfRange(data, ADV_PREFIX.length, ADV_PREFIX.length+UUID_LEN);
-			// Now filter our beacons UUID if any
+		Log.i(Utils.LOG_TAG,Arrays.toString(data));
+		// First, check the prefix for our beacons
+		if(data[0]==0x02 && data[1]==0x01 && data[4]==(byte)0xFF && data[7]==0x02){ // iBeacon candidate
+			byte[] uuid = Arrays.copyOfRange(data, ADV_PREFIX_LENGTH, ADV_PREFIX_LENGTH + ADV_UUID_LENGTH);
+			// Now filter beacons based on UUID if any
 			if(_uuid == null || Arrays.equals(_uuid, uuid)){
-				int offset = ADV_PREFIX.length + UUID_LEN;
+				int offset = ADV_PREFIX_LENGTH + ADV_UUID_LENGTH;
 				IBeacon ibeacon = new IBeacon();
 				ibeacon.setUuid(uuid);
 				int major = ((data[offset] << 8) & 0x0000ff00) | (data[offset+1] & 0x000000ff);
@@ -321,11 +390,22 @@ public class IBeaconProtocol {
 				ibeacon.setMinor(minor);
 				ibeacon.setPowerValue(data[offset+4]);
 				return ibeacon;
-				}
 			}
+		}
 		return null;
 	}
 	
+	/**
+	 * Returns the connectable state of an iBeacon (easiBeacon only)
+	 * 
+	 * @param data advertisement data
+	 * @return <code>true</code> if the easiBeacon is in connectable mode, <code>false</code> otherwise.
+	 */
+	private boolean getConnectable(byte[] data){
+		// If byte 31 of the advertisement is 0 then is not connectable
+		if(data[31] != 0) return true;
+		return false;
+	}
 	
 	/**
 	 * Roughly estimates the distance to the iBeacon

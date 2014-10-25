@@ -23,8 +23,6 @@ package com.easibeacon.protocol;
 
 import java.io.Serializable;
 
-import android.util.Log;
-
 /**
  * Represents an iBeacon device
  * 
@@ -56,9 +54,14 @@ public class IBeacon implements Serializable{
 	private boolean _easiBeacon = false;
 
 	/**
-	 * RSSI at 1 meter reported by the iBeacon
+	 * The version/model of the easiBeacon (if this is an easiBeacon)
 	 */
-	private int _powerValue;
+	private String _versionModel;
+
+	/**
+	 * TX Power for the iBeacon
+	 */
+	private int _txPower;
 	
 	/**
 	 * A calculated proximity of the iBeacon based on <code>_powerValue</code>
@@ -71,10 +74,35 @@ public class IBeacon implements Serializable{
 	private String _macAddress;
 	
 	/**
-	 * RSSI at 1 meter in straight line for easiBeacons
+	 * The battery reported by the iBeacon
 	 */	
-	public static final int EASIBEACON_POWER_VALUE = -75;
+	private int _battery = -1;
+
+	/**
+	 * The broadcast rate reported by the iBeacon
+	 */	
+	private int _broadcastRate = -1;
 	
+	/**
+	 * The RSSI at 1 meter reported by the iBeacon
+	 */		
+	private int _powerValue = -1;
+	
+	/**
+	 * Indicates if currently connectable (easiBeacon only)
+	 */		
+	private boolean _connectable = false;
+	
+	/**
+	 * A user selected name for the iBeacon (to be used)
+	 */
+	private String _name = null;
+
+	/**
+	 * A user selected color representation for the iBeacon (to be used)
+	 */
+	private int _color;
+
 	/**
 	 * Constructor
 	 * 
@@ -117,6 +145,20 @@ public class IBeacon implements Serializable{
 		this._macAddress = _macAddress;
 	}
 
+	public void setVersionModel(String _versionModel) {
+		this._versionModel = _versionModel;
+	}
+
+	public int getVersion() {
+		int i = Integer.parseInt(""+_versionModel.charAt(1));
+		return i;
+	}
+
+	public int getModel(){
+		int i = Integer.parseInt(""+_versionModel.charAt(0));
+		return i;
+	}
+	
 	public byte[] getUuid() {
 		return _uuid;
 	}
@@ -124,7 +166,7 @@ public class IBeacon implements Serializable{
 	public String getUuidHexString(){
 		String s = "";
 		for(int i=0;i<_uuid.length;i++)
-			s += String.format("%2X", _uuid[i]);
+			s += String.format("%02X", _uuid[i]);
 		return s;	
 	}
 	
@@ -158,6 +200,14 @@ public class IBeacon implements Serializable{
 		this._minor = _minor;
 	}
 	
+	public String getName() {
+		return _name;
+	}
+
+	public void setName(String _name) {
+		this._name = _name;
+	}
+
 	public boolean isEasiBeacon() {
 		return _easiBeacon;
 	}
@@ -166,12 +216,20 @@ public class IBeacon implements Serializable{
 		this._easiBeacon = _easiBeacon;
 	}
 
-	public int getPowerValue() {
-		return _powerValue;
+	public int getColor() {
+		return _color;
 	}
 
-	public void setPowerValue(int _pv) {
-		this._powerValue = _pv;
+	public void setColor(int _color) {
+		this._color = _color;
+	}
+
+	public int getTxPower() {
+		return _txPower;
+	}
+
+	public void setTxPower(int _txPower) {
+		this._txPower = _txPower;
 	}
 
 	public int getProximity() {
@@ -183,8 +241,41 @@ public class IBeacon implements Serializable{
 	}
 	
 
+	public int getBattery() {
+		return _battery;
+	}
+
+	public void setBattery(int _battery) {
+		this._battery = _battery;
+	}
+
+	public int getBroadcastRate() {
+		return _broadcastRate;
+	}
+
+	public void setBroadcastRate(int _broadcastRate) {
+		this._broadcastRate = _broadcastRate;
+	}
+
+	public int getPowerValue() {
+		return _powerValue;
+	}
+
+	public void setPowerValue(int _powerValue) {
+		this._powerValue = _powerValue;
+	}
+	
+	public boolean isConnectable(){
+		return _connectable;
+	}
+	
+	public void setConnectable(boolean b){
+		_connectable = b;
+	}
+
 	/**
-	 * Two iBeacons are the same if UUID, major and minor are the same.
+	 * Two iBeacons are the same if UUID, major, minor and MAC addresses are the same.
+	 * The MAC address comparison is to avoid detecting as the same two different iBeacons with factory settings.
 	 */
 	@Override
 	public boolean equals(Object obj) {
@@ -194,8 +285,20 @@ public class IBeacon implements Serializable{
 	    if (getClass() != obj.getClass()) {
 	        return false;
 	    }
-	    Log.i(Utils.LOG_TAG, "Comparing");
+	   // Log.i(Utils.LOG_TAG, "Comparing");
 	    final IBeacon ibeacon = (IBeacon) obj;
+		if(this.isSameRegionAs(ibeacon) && _macAddress.equals(ibeacon.getMacAddress()))
+			return true;
+		return false;
+	}
+	
+	/**
+	 * Returns true if the iBeacon to compare represents the same region (same UUID, major and minor).
+	 */
+	public boolean isSameRegionAs(IBeacon ibeacon) {
+	    if (ibeacon == null) {
+	        return false;
+	    }
 		if(getUuidHexString().equals(ibeacon.getUuidHexString())
 				&& _major == ibeacon.getMajor()
 				&& _minor == ibeacon.getMinor())
